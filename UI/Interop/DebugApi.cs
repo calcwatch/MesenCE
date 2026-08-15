@@ -28,6 +28,8 @@ namespace Mesen.Interop
 		[DllImport(DllPath)] public static extern void StopLogTraceToFile();
 
 		[DllImport(DllPath)] public static extern void SetTraceOptions(CpuType cpuType, InteropTraceLoggerOptions options);
+		[DllImport(DllPath)] public static extern void SetTraceLogToMemory(CpuType cpuType, [MarshalAs(UnmanagedType.I1)] bool enabled);
+		[DllImport(DllPath)] public static extern void SetTraceOnly([MarshalAs(UnmanagedType.I1)] bool enabled);
 
 		public const int TraceLogBufferSize = 30000;
 		[DllImport(DllPath)] public static extern void ClearExecutionTrace();

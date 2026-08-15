@@ -57,6 +57,7 @@ namespace Mesen.Debugger.ViewModels
 		public QuickSearchViewModel QuickSearch { get; } = new();
 
 		private DisassemblyViewer? _viewer = null;
+		private Window? _window = null;
 
 		public TraceLoggerViewModel()
 		{
@@ -88,6 +89,12 @@ namespace Mesen.Debugger.ViewModels
 
 			AddDisposable(this.ObserveProp(nameof(IsLoggingToFile), () => {
 				AllowOpenTraceFile = !IsLoggingToFile && TraceFile != null;
+				UpdateCoreOptions();
+			}));
+
+			AddDisposable(Config.ObserveProp(nameof(Config.EchoToGui), () => {
+				UpdateCoreOptions();
+				UpdateLog();
 			}));
 
 			AddDisposable(this.ObserveProp([nameof(SelectionStart), nameof(SelectionEnd), nameof(SelectedRow), nameof(SelectionAnchor)], () => {
@@ -143,6 +150,7 @@ namespace Mesen.Debugger.ViewModels
 
 		public void InitializeMenu(Window wnd)
 		{
+			_window = wnd;
 			FileMenuItems = AddDisposables(new List<ContextMenuAction>() {
 				new ContextMenuAction() {
 					ActionType = ActionType.Exit,
@@ -200,6 +208,10 @@ namespace Mesen.Debugger.ViewModels
 			DebugShortcutManager.RegisterActions(wnd, DebugMenuItems);
 			DebugShortcutManager.RegisterActions(wnd, ViewMenuItems);
 			DebugShortcutManager.RegisterActions(wnd, SearchMenuItems);
+
+			if(!Config.EchoToGui && !IsLoggingToFile) {
+				UpdateCoreOptions();
+			}
 		}
 
 		public void InvalidateVisual()
@@ -251,8 +263,9 @@ namespace Mesen.Debugger.ViewModels
 			RomInfo romInfo = EmuApi.GetRomInfo();
 			foreach(CpuType cpuType in romInfo.CpuTypes) {
 				TraceLoggerCpuConfig cfg = Config.GetCpuConfig(cpuType);
+				bool cpuEnabled = romInfo.CpuTypes.Count == 1 || cfg.Enabled;
 				InteropTraceLoggerOptions options = new InteropTraceLoggerOptions() {
-					Enabled = romInfo.CpuTypes.Count == 1 || cfg.Enabled,
+					Enabled = cpuEnabled && (Config.EchoToGui || IsLoggingToFile),
 					UseLabels = cfg.UseLabels,
 					IndentCode = cfg.IndentCode,
 					Format = Encoding.UTF8.GetBytes(cfg.UseCustomFormat ? cfg.Format : TraceLoggerOptionTab.GetAutoFormat(cfg, cpuType)),
@@ -262,12 +275,24 @@ namespace Mesen.Debugger.ViewModels
 				Array.Resize(ref options.Condition, 1000);
 				Array.Resize(ref options.Format, 1000);
 
+				DebugApi.SetTraceLogToMemory(cpuType, Config.EchoToGui);
 				DebugApi.SetTraceOptions(cpuType, options);
 			}
+
+			DebugApi.SetTraceOnly(_window != null && !DebugWindowManager.HasOtherDebugWindows(_window));
+
 		}
 
 		public void UpdateLog(bool scrollToBottom = false)
 		{
+			if(!Config.EchoToGui) {
+				Dispatcher.UIThread.Post(() => {
+					MinScrollPosition = MaxScrollPosition;
+					TraceLogLines = Array.Empty<CodeLineData>();
+				});
+				return;
+			}
+
 			int traceSize = (int)DebugApi.GetExecutionTraceSize();
 			CodeLineData[] lines = GetCodeLines(ScrollPosition, VisibleRowCount);
 
@@ -499,7 +524,7 @@ namespace Mesen.Debugger.ViewModels
 				_traceLogger.SelectedTab = this;
 			}
 
-			if(!string.IsNullOrWhiteSpace(Options.Condition)) {
+			if((_traceLogger.Config.EchoToGui || _traceLogger.IsLoggingToFile) && !string.IsNullOrWhiteSpace(Options.Condition)) {
 				DebugApi.EvaluateExpression(Options.Condition, CpuType, out EvalResultType result, false);
 				IsConditionValid = result == EvalResultType.Numeric || result == EvalResultType.Boolean;
 			} else {

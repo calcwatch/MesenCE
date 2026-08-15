@@ -93,6 +93,8 @@ public:
 	void ProcessInstruction();
 	void ProcessRead(uint32_t addr, uint8_t value, MemoryOperationType type);
 	void ProcessWrite(uint32_t addr, uint8_t value, MemoryOperationType type);
+	void ProcessTraceRead(uint32_t addr, uint8_t value, MemoryOperationType type);
+	void ProcessTraceWrite(uint32_t addr, uint8_t value, MemoryOperationType type);
 	void ProcessIdleCycle();
 	void ProcessInterrupt(uint32_t originalPc, uint32_t currentPc, bool forNmi) override;
 	void ProcessPpuRead(uint16_t addr, uint8_t value, MemoryType memoryType);

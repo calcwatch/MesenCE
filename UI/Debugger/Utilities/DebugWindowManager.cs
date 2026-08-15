@@ -21,6 +21,9 @@ namespace Mesen.Debugger.Utilities
 
 		public static T CreateDebugWindow<T>(Func<T> createWindow) where T : MesenWindow
 		{
+			// Until the new window has finished initializing, assume the full debugger
+			// is required.  A sole trace window will opt back into trace-only mode.
+			DebugApi.SetTraceOnly(false);
 			if(Interlocked.Increment(ref _debugWindowCounter) == 1) {
 				//Opened a debug window and nothing else was opened, load the saved workspace
 				DebugWorkspaceManager.Load();
@@ -76,6 +79,11 @@ namespace Mesen.Debugger.Utilities
 		{
 			//Remove window from list first, to ensure no more notifications are sent to it
 			_openedWindows.TryRemove(wnd, out _);
+			foreach(Window openedWindow in _openedWindows.Keys) {
+				if(openedWindow is TraceLoggerWindow traceWindow) {
+					traceWindow.UpdateCoreOptions();
+				}
+			}
 
 			if(Interlocked.Decrement(ref _debugWindowCounter) == 0) {
 				//Closed the last debug window, save the workspace and turn off the debugger
@@ -97,6 +105,16 @@ namespace Mesen.Debugger.Utilities
 		public static bool HasOpenedDebugWindows()
 		{
 			return _debugWindowCounter > 0;
+		}
+
+		public static bool HasOtherDebugWindows(Window window)
+		{
+			foreach(Window openedWindow in _openedWindows.Keys) {
+				if(openedWindow != window) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		public static void CloseAllWindows()
@@ -157,7 +175,7 @@ namespace Mesen.Debugger.Utilities
 				if(_windowNotifLock.TryEnterReadLock(100)) {
 					try {
 						foreach(Window window in _openedWindows.Keys) {
-							if(window is INotificationHandler handler) {
+							if(window is INotificationHandler handler && handler.ShouldProcessNotification(e)) {
 								handler.ProcessNotification(e);
 							}
 						}

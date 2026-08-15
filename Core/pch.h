@@ -30,8 +30,10 @@
 #include <list>
 #include <atomic>
 #include <thread>
+#include <type_traits>
 #include <deque>
 #include <algorithm>
+#include <charconv>
 #include <assert.h>
 
 #include "Utilities/UTF8Util.h"

@@ -12,6 +12,16 @@ struct TraceRow
 	char LogOutput[500];
 };
 
+struct TraceLogPpuState
+{
+	uint32_t Cycle;
+	uint32_t HClock;
+	int32_t Scanline;
+	uint32_t FrameCount;
+};
+
+struct CapturedTraceRow;
+
 struct TraceLoggerOptions
 {
 	bool Enabled;
@@ -33,6 +43,8 @@ public:
 	virtual void GetExecutionTrace(TraceRow& row, uint32_t offset) = 0;
 	virtual void Clear() = 0;
 	virtual void SetOptions(TraceLoggerOptions options) = 0;
+	virtual void SetLogToMemory(bool enabled) = 0;
+	virtual void FormatCapturedRow(CapturedTraceRow& row, string& output) = 0;
 
 	__forceinline bool IsEnabled() { return _enabled; }
 };

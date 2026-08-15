@@ -122,14 +122,6 @@ enum class RowDataType
 	DI
 };
 
-struct TraceLogPpuState
-{
-	uint32_t Cycle;
-	uint32_t HClock;
-	int32_t Scanline;
-	uint32_t FrameCount;
-};
-
 struct RowPart
 {
 	RowDataType DataType;
@@ -155,11 +147,12 @@ protected:
 	MemoryType _cpuMemoryType = MemoryType::SnesMemory;
 
 	vector<RowPart> _rowParts;
-	string _fileLogRow;
+	std::mutex _formatMutex;
 
 	uint32_t _currentPos = 0;
 
 	bool _pendingLog = false;
+	bool _logToMemory = true;
 	CpuStateType _lastState = {};
 	DisassemblyInfo _lastDisassemblyInfo = {};
 
@@ -170,6 +163,22 @@ protected:
 
 	unique_ptr<ExpressionEvaluator> _expEvaluator;
 	ExpressionData _conditionData;
+	EffectiveAddressInfo _cachedEffectiveAddress = {};
+	bool _cachedEffectiveAddressValid = false;
+	uint32_t _cachedMemoryValue = 0;
+	bool _cachedMemoryValueValid = false;
+	bool _needsPpuState = false;
+	bool _needsEffectiveAddress = false;
+	bool _needsMemoryValue = false;
+
+	EffectiveAddressInfo GetEffectiveAddress(DisassemblyInfo& info, void* cpuState, CpuType cpuType)
+	{
+		if(!_cachedEffectiveAddressValid) {
+			_cachedEffectiveAddress = info.GetEffectiveAddress(_debugger, cpuState, cpuType);
+			_cachedEffectiveAddressValid = true;
+		}
+		return _cachedEffectiveAddress;
+	}
 
 	void WriteByteCode(DisassemblyInfo& info, RowPart& rowPart, string& output)
 	{
@@ -202,7 +211,7 @@ protected:
 
 	void WriteEffectiveAddress(DisassemblyInfo& info, RowPart& rowPart, void* cpuState, string& output, MemoryType cpuMemoryType, CpuType cpuType)
 	{
-		EffectiveAddressInfo effectiveAddress = info.GetEffectiveAddress(_debugger, cpuState, cpuType);
+		EffectiveAddressInfo effectiveAddress = GetEffectiveAddress(info, cpuState, cpuType);
 		if(effectiveAddress.ShowAddress && effectiveAddress.Address >= 0) {
 			MemoryType effectiveMemType = effectiveAddress.Type == MemoryType::None ? cpuMemoryType : effectiveAddress.Type;
 			if(_options.UseLabels) {
@@ -225,10 +234,10 @@ protected:
 
 	void WriteMemoryValue(DisassemblyInfo& info, RowPart& rowPart, void* cpuState, string& output, MemoryType memType, CpuType cpuType)
 	{
-		EffectiveAddressInfo effectiveAddress = info.GetEffectiveAddress(_debugger, cpuState, cpuType);
+		EffectiveAddressInfo effectiveAddress = GetEffectiveAddress(info, cpuState, cpuType);
 		if(effectiveAddress.Address >= 0 && effectiveAddress.ValueSize > 0) {
 			MemoryType effectiveMemType = effectiveAddress.Type == MemoryType::None ? memType : effectiveAddress.Type;
-			uint16_t value = info.GetMemoryValue(effectiveAddress, _memoryDumper, effectiveMemType);
+			uint32_t value = _cachedMemoryValueValid ? _cachedMemoryValue : info.GetMemoryValue(effectiveAddress, _memoryDumper, effectiveMemType);
 			if(rowPart.DisplayInHex) {
 				output += "= $";
 				if(effectiveAddress.ValueSize == 2) {
@@ -270,15 +279,36 @@ protected:
 	template<typename T>
 	void WriteIntValue(string& output, T value, RowPart& rowPart)
 	{
-		string str = rowPart.DisplayInHex ? HexUtilities::ToHex(value) : std::to_string(value);
-		if(rowPart.MinWidth > (int)str.size()) {
-			if(rowPart.DisplayInHex) {
-				str = std::string(rowPart.MinWidth - str.size(), '0') + str;
+		if(rowPart.DisplayInHex) {
+			using UnsignedT = typename std::make_unsigned<T>::type;
+			UnsignedT unsignedValue = (UnsignedT)value;
+			size_t digitCount;
+			if constexpr(sizeof(T) == 4) {
+				digitCount = unsignedValue <= 0xFF ? 2 : unsignedValue <= 0xFFFF ? 4 : unsignedValue <= 0xFFFFFF ? 6 : 8;
 			} else {
-				str += std::string(rowPart.MinWidth - str.size(), ' ');
+				digitCount = sizeof(T) * 2;
 			}
+			if(rowPart.MinWidth > (int)digitCount) {
+				output.append(rowPart.MinWidth - digitCount, '0');
+			}
+
+			static constexpr char HexDigits[] = "0123456789ABCDEF";
+			char buffer[16];
+			for(size_t i = 0; i < digitCount; i++) {
+				size_t shift = (digitCount - i - 1) * 4;
+				buffer[i] = shift < sizeof(T) * 8 ? HexDigits[(unsignedValue >> shift) & 0x0F] : '0';
+			}
+			output.append(buffer, digitCount);
+			return;
 		}
-		output += str;
+
+		char buffer[32];
+		auto result = std::to_chars(buffer, buffer + sizeof(buffer), value, 10);
+		size_t length = result.ptr - buffer;
+		output.append(buffer, length);
+		if(rowPart.MinWidth > (int)length) {
+			output.append(rowPart.MinWidth - length, ' ');
+		}
 	}
 
 	void WriteStringValue(string& output, string value, RowPart& rowPart)
@@ -291,35 +321,58 @@ protected:
 
 	void AddRow(CpuStateType& cpuState, DisassemblyInfo& disassemblyInfo)
 	{
-		_disassemblyCache[_currentPos] = disassemblyInfo;
-		_cpuState[_currentPos] = cpuState;
-		((TraceLoggerType*)this)->LogPpuState();
+		if(_logToMemory) {
+			_disassemblyCache[_currentPos] = disassemblyInfo;
+			_cpuState[_currentPos] = cpuState;
+		}
 
-		_rowIds[_currentPos] = ITraceLogger::NextRowId;
-		ITraceLogger::NextRowId++;
+		if(_logToMemory || _needsPpuState) {
+			((TraceLoggerType*)this)->LogPpuState();
+		}
+
+		if(_logToMemory) {
+			_rowIds[_currentPos] = ITraceLogger::NextRowId;
+			ITraceLogger::NextRowId++;
+		}
 
 		_pendingLog = false;
 
 		if(_debugger->GetTraceLogFileSaver()->IsEnabled()) {
-			_fileLogRow.clear();
+			static_assert(sizeof(CpuStateType) <= CapturedTraceRow::MaxCpuStateSize, "CPU state is too large for an asynchronous trace record");
+			// Effective-address decoding may adjust fields in the supplied state (e.g. the
+			// SNES M/X flags) while running its dummy CPU.  Never let that touch the live
+			// emulation state.
+			CpuStateType capturedCpuState = cpuState;
+			CapturedTraceRow row;
+			row.Logger = this;
+			row.Disassembly = disassemblyInfo;
+			row.PpuState = _ppuState[_currentPos];
+			memcpy(row.CpuState, &capturedCpuState, sizeof(CpuStateType));
 
-			//Display PC
-			RowPart rowPart = {};
-			rowPart.DisplayInHex = true;
-			rowPart.MinWidth = DebugUtilities::GetProgramCounterSize(_cpuType);
-			WriteIntValue(_fileLogRow, ((TraceLoggerType*)this)->GetProgramCounter(cpuState), rowPart);
-			_fileLogRow += "  ";
+			if(_needsEffectiveAddress || _needsMemoryValue) {
+				row.EffectiveAddress = disassemblyInfo.GetEffectiveAddress(_debugger, &capturedCpuState, _cpuType);
+				row.HasEffectiveAddress = true;
+				if(_needsMemoryValue && row.EffectiveAddress.Address >= 0 && row.EffectiveAddress.ValueSize > 0) {
+					MemoryType memoryType = row.EffectiveAddress.Type == MemoryType::None ? _cpuMemoryType : row.EffectiveAddress.Type;
+					row.MemoryValue = disassemblyInfo.GetMemoryValue(row.EffectiveAddress, _memoryDumper, memoryType);
+					row.HasMemoryValue = true;
+				}
+			}
 
-			((TraceLoggerType*)this)->GetTraceRow(_fileLogRow, cpuState, _ppuState[_currentPos], disassemblyInfo);
-			_debugger->GetTraceLogFileSaver()->Log(_fileLogRow);
+			_debugger->GetTraceLogFileSaver()->Log(std::move(row));
 		}
 
-		_currentPos = (_currentPos + 1) % ExecutionLogSize;
+		if(_logToMemory) {
+			_currentPos = (_currentPos + 1) % ExecutionLogSize;
+		}
 	}
 
 	void ParseFormatString(string format)
 	{
 		_rowParts.clear();
+		_needsPpuState = false;
+		_needsEffectiveAddress = false;
+		_needsMemoryValue = false;
 
 		std::regex formatRegex = std::regex("(\\[\\s*([^[]*?)\\s*(,\\s*([\\d]*)\\s*(h){0,1}){0,1}\\s*\\])|([^[]*)", std::regex_constants::icase);
 		std::sregex_iterator start = std::sregex_iterator(format.cbegin(), format.cend(), formatRegex);
@@ -351,6 +404,15 @@ protected:
 				part.DisplayInHex = match.str(5) == "h";
 
 				_rowParts.push_back(part);
+			}
+		}
+
+		for(RowPart& part : _rowParts) {
+			_needsEffectiveAddress |= part.DataType == RowDataType::EffectiveAddress || part.DataType == RowDataType::MemoryValue;
+			_needsMemoryValue |= part.DataType == RowDataType::MemoryValue;
+			if(part.DataType == RowDataType::Cycle || part.DataType == RowDataType::HClock ||
+				part.DataType == RowDataType::Scanline || part.DataType == RowDataType::FrameCount) {
+				_needsPpuState = true;
 			}
 		}
 	}
@@ -417,8 +479,6 @@ public:
 		_options = {};
 		_currentPos = 0;
 		_pendingLog = false;
-		_fileLogRow.reserve(300);
-
 		_disassemblyCache = new DisassemblyInfo[BaseTraceLogger::ExecutionLogSize];
 		_rowIds = new uint64_t[BaseTraceLogger::ExecutionLogSize];
 		memset(_disassemblyCache, 0, sizeof(DisassemblyInfo) * BaseTraceLogger::ExecutionLogSize);
@@ -482,6 +542,7 @@ public:
 	void SetOptions(TraceLoggerOptions options) override
 	{
 		DebugBreakHelper helper(_debugger);
+		_debugger->GetTraceLogFileSaver()->FlushPending();
 		_options = options;
 
 		_enabled = options.Enabled;
@@ -501,6 +562,32 @@ public:
 		ParseFormatString(format);
 
 		_debugger->ProcessConfigChange();
+	}
+
+	void SetLogToMemory(bool enabled) override
+	{
+		DebugBreakHelper helper(_debugger);
+		_debugger->GetTraceLogFileSaver()->FlushPending();
+		_logToMemory = enabled;
+	}
+
+	void FormatCapturedRow(CapturedTraceRow& row, string& output) override
+	{
+		std::lock_guard<std::mutex> lock(_formatMutex);
+		CpuStateType cpuState;
+		memcpy(&cpuState, row.CpuState, sizeof(CpuStateType));
+		_cachedEffectiveAddress = row.EffectiveAddress;
+		_cachedEffectiveAddressValid = row.HasEffectiveAddress;
+		_cachedMemoryValue = row.MemoryValue;
+		_cachedMemoryValueValid = row.HasMemoryValue;
+
+		RowPart pcPart = {};
+		pcPart.DisplayInHex = true;
+		pcPart.MinWidth = DebugUtilities::GetProgramCounterSize(_cpuType);
+		WriteIntValue(output, ((TraceLoggerType*)this)->GetProgramCounter(cpuState), pcPart);
+		output += "  ";
+		((TraceLoggerType*)this)->GetTraceRow(output, cpuState, row.PpuState, row.Disassembly);
+		output += '\n';
 	}
 
 	int64_t GetRowId(uint32_t offset) override
@@ -526,6 +613,7 @@ public:
 
 	void GetExecutionTrace(TraceRow& row, uint32_t offset) override
 	{
+		std::lock_guard<std::mutex> lock(_formatMutex);
 		int pos = ((int)_currentPos - offset);
 		int index = (pos > 0 ? pos : BaseTraceLogger::ExecutionLogSize + pos) - 1;
 

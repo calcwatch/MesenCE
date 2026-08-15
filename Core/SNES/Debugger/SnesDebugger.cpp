@@ -278,6 +278,32 @@ void SnesDebugger::ProcessRead(uint32_t addr, uint8_t value, MemoryOperationType
 	}
 }
 
+void SnesDebugger::ProcessTraceRead(uint32_t addr, uint8_t value, MemoryOperationType type)
+{
+	if(!_traceLogger->IsEnabled()) {
+		return;
+	}
+
+	AddressInfo addressInfo = GetAbsoluteAddress(addr);
+	MemoryOperationInfo operation(addr, value, type, _cpuMemType);
+	if(type == MemoryOperationType::ExecOpCode) {
+		SnesCpuState& state = GetCpuState();
+		DisassemblyInfo disInfo = _disassembler->GetDisassemblyInfo(addressInfo, addr, state.PS, _cpuType);
+		_traceLogger->Log(state, disInfo, operation, addressInfo);
+	} else {
+		_traceLogger->LogNonExec(operation, addressInfo);
+	}
+}
+
+void SnesDebugger::ProcessTraceWrite(uint32_t addr, uint8_t value, MemoryOperationType type)
+{
+	if(_traceLogger->IsEnabled()) {
+		AddressInfo addressInfo = GetAbsoluteAddress(addr);
+		MemoryOperationInfo operation(addr, value, type, _cpuMemType);
+		_traceLogger->LogNonExec(operation, addressInfo);
+	}
+}
+
 void SnesDebugger::ProcessWrite(uint32_t addr, uint8_t value, MemoryOperationType type)
 {
 	AddressInfo addressInfo = GetAbsoluteAddress(addr);

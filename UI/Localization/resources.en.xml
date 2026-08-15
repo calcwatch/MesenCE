@@ -1292,6 +1292,7 @@
 			<Control ID="btnStart">Log to file...</Control>
 			<Control ID="btnStop">Stop logging</Control>
 			<Control ID="btnClear">Clear log</Control>
+			<Control ID="chkEchoToGui">Echo to GUI</Control>
 		</Form>
 
 		<Form ID="EventViewerWindow">

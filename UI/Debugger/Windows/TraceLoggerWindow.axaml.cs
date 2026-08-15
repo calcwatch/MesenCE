@@ -64,6 +64,17 @@ namespace Mesen.Debugger.Windows
 			}
 		}
 
+		protected override void OnOpened(EventArgs e)
+		{
+			base.OnOpened(e);
+
+			// Some controls evaluate bindings while the visual tree is attached.  Run
+			// the idle-detach check again after all of that initialization has finished.
+			if(!_model.Config.EchoToGui && !_model.IsLoggingToFile) {
+				_model.UpdateCoreOptions();
+			}
+		}
+
 		private LocationInfo ActionLocation => _selectionHandler?.ActionLocation ?? new LocationInfo();
 		private CpuType CpuType => ActionLocation?.RelAddress?.Type.ToCpuType() ?? ActionLocation?.AbsAddress?.Type.ToCpuType() ?? _model.SelectedTab.CpuType;
 
@@ -173,19 +184,30 @@ namespace Mesen.Debugger.Windows
 					break;
 
 				case ConsoleNotificationType.CodeBreak: {
-					if(_model.Config.RefreshOnBreakPause) {
+					if(_model.Config.EchoToGui && _model.Config.RefreshOnBreakPause) {
 						_model.UpdateLog(true);
 					}
 					break;
 				}
 
 				case ConsoleNotificationType.PpuFrameDone: {
-					if(_model.Config.AutoRefresh && !ToolRefreshHelper.LimitFps(this, 10)) {
+					if(_model.Config.EchoToGui && _model.Config.AutoRefresh && !ToolRefreshHelper.LimitFps(this, 10)) {
 						_model.UpdateLog(true);
 					}
 					break;
 				}
 			}
+		}
+
+		public bool ShouldProcessNotification(NotificationEventArgs e)
+		{
+			return e.NotificationType == ConsoleNotificationType.GameLoaded ||
+				_model.Config.EchoToGui;
+		}
+
+		public void UpdateCoreOptions()
+		{
+			_model.UpdateCoreOptions();
 		}
 
 		private async void OnStartLoggingClick(object sender, RoutedEventArgs e)
@@ -199,16 +221,16 @@ namespace Mesen.Debugger.Windows
 			);
 			if(filename != null) {
 				_model.TraceFile = filename;
-				_model.IsLoggingToFile = true;
 				DebugApi.StartLogTraceToFile(filename);
+				_model.IsLoggingToFile = true;
 			}
 		}
 
 		private void OnStopLoggingClick(object sender, RoutedEventArgs e)
 		{
 			if(_model.IsLoggingToFile) {
-				_model.IsLoggingToFile = false;
 				DebugApi.StopLogTraceToFile();
+				_model.IsLoggingToFile = false;
 			}
 		}
 

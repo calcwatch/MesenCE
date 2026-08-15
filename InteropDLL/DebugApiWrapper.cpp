@@ -22,6 +22,7 @@
 #include "Core/Debugger/ITraceLogger.h"
 #include "Core/Debugger/TraceLogFileSaver.h"
 #include "Core/Debugger/FrozenAddressManager.h"
+#include "Core/Debugger/DebugBreakHelper.h"
 #include "Core/Gameboy/GbTypes.h"
 #include "Utilities/StringUtilities.h"
 
@@ -44,6 +45,17 @@ void WrapDebuggerCall(std::function<void(Debugger* debugger)> func)
 	DebuggerRequest dbgRequest = _emu->GetDebugger(true);
 	if(dbgRequest.GetDebugger()) {
 		func(dbgRequest.GetDebugger());
+	}
+}
+
+template<typename T>
+T WrapActiveDebuggerCall(std::function<T(Debugger* debugger)> func)
+{
+	DebuggerRequest dbgRequest = _emu->GetDebugger(false);
+	if(dbgRequest.GetDebugger()) {
+		return func(dbgRequest.GetDebugger());
+	} else {
+		return {};
 	}
 }
 
@@ -83,7 +95,10 @@ extern "C"
 
 	DllExport void __stdcall Step(CpuType cpuType, uint32_t count, StepType type)
 	{
-		WithDebugger(void, Step(cpuType, count, type));
+		WrapDebuggerCall<void>([&](Debugger* dbg) {
+			dbg->SetTraceOnly(false);
+			dbg->Step(cpuType, count, type);
+		});
 	}
 
 	DllExport uint32_t __stdcall GetDisassemblyOutput(CpuType type, uint32_t lineIndex, CodeLineData output[], uint32_t rowCount)
@@ -111,9 +126,26 @@ extern "C"
 		WithToolVoid(GetTraceLogger(type), SetOptions(options));
 	}
 
+	DllExport void __stdcall SetTraceLogToMemory(CpuType type, bool enabled)
+	{
+		WithToolVoid(GetTraceLogger(type), SetLogToMemory(enabled));
+	}
+
+	DllExport void __stdcall SetTraceOnly(bool enabled)
+	{
+		DebuggerRequest request = _emu->GetDebugger(false);
+		if(request.GetDebugger()) {
+			request.GetDebugger()->SetTraceOnly(enabled);
+		}
+	}
+
 	DllExport uint32_t __stdcall GetExecutionTrace(TraceRow output[], uint32_t startOffset, uint32_t lineCount)
 	{
-		return WithDebugger(uint32_t, GetExecutionTrace(output, startOffset, lineCount));
+		// Reading an inactive trace buffer must not initialize the debugger.  UI
+		// bindings query the selected row while constructing the trace window.
+		return WrapActiveDebuggerCall<uint32_t>([&](Debugger* dbg) {
+			return dbg->GetExecutionTrace(output, startOffset, lineCount);
+		});
 	}
 
 	DllExport void __stdcall ClearExecutionTrace()
@@ -123,12 +155,19 @@ extern "C"
 
 	DllExport void __stdcall StartLogTraceToFile(const char* filename)
 	{
-		WithDebugger(void, GetTraceLogFileSaver()->StartLogging(filename));
+		WrapDebuggerCall<void>([&](Debugger* dbg) {
+			DebugBreakHelper helper(dbg);
+			dbg->GetTraceLogFileSaver()->StartLogging(filename);
+		});
 	}
 
 	DllExport void __stdcall StopLogTraceToFile()
 	{
-		WithDebugger(void, GetTraceLogFileSaver()->StopLogging());
+		WrapDebuggerCall<void>([&](Debugger* dbg) {
+			dbg->GetTraceLogFileSaver()->PrepareToStop();
+			DebugBreakHelper helper(dbg);
+			dbg->GetTraceLogFileSaver()->StopLogging();
+		});
 	}
 
 	DllExport void __stdcall SetBreakpoints(Breakpoint breakpoints[], uint32_t length)
@@ -215,7 +254,11 @@ extern "C"
 
 	DllExport DebuggerFeatures __stdcall GetDebuggerFeatures(CpuType cpuType)
 	{
-		return WithDebugger(DebuggerFeatures, GetDebuggerFeatures(cpuType));
+		// Feature checks are performed by menu and toolbar bindings.  They must not
+		// recreate a debugger that an idle debug window deliberately released.
+		return WrapActiveDebuggerCall<DebuggerFeatures>([&](Debugger* dbg) {
+			return dbg->GetDebuggerFeatures(cpuType);
+		});
 	}
 
 	DllExport CpuInstructionProgress __stdcall GetInstructionProgress(CpuType cpuType)

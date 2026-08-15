@@ -253,6 +253,12 @@ void Debugger::ProcessInstruction()
 template<CpuType type, uint8_t accessWidth, MemoryAccessFlags flags, typename T>
 void Debugger::ProcessMemoryRead(uint32_t addr, T& value, MemoryOperationType opType)
 {
+	if constexpr(type == CpuType::Snes && accessWidth == 1) {
+		if(IsTraceOnly()) {
+			GetDebugger<CpuType::Snes, SnesDebugger>()->ProcessTraceRead(addr, (uint8_t)value, opType);
+			return;
+		}
+	}
 	if(_debuggers[(int)type].Debugger->IsStepBack()) {
 		SleepOnBreakRequest<type>();
 		return;
@@ -286,6 +292,12 @@ void Debugger::ProcessMemoryRead(uint32_t addr, T& value, MemoryOperationType op
 template<CpuType type, uint8_t accessWidth, MemoryAccessFlags flags, typename T>
 bool Debugger::ProcessMemoryWrite(uint32_t addr, T& value, MemoryOperationType opType)
 {
+	if constexpr(type == CpuType::Snes && accessWidth == 1) {
+		if(IsTraceOnly()) {
+			GetDebugger<CpuType::Snes, SnesDebugger>()->ProcessTraceWrite(addr, (uint8_t)value, opType);
+			return true;
+		}
+	}
 	if(_debuggers[(int)type].Debugger->IsStepBack()) {
 		SleepOnBreakRequest<type>();
 		return !_debuggers[(int)type].Debugger->GetFrozenAddressManager().IsFrozenAddress(addr);
@@ -665,6 +677,7 @@ void Debugger::ProcessScripts(uint32_t addr, T& value, MemoryType memType, Memor
 
 void Debugger::ProcessConfigChange()
 {
+	_traceLogSaver->FlushPending();
 	for(int i = 0; i <= (int)DebugUtilities::GetLastCpuType(); i++) {
 		if(_debuggers[i].Debugger) {
 			_debuggers[i].Debugger->ProcessConfigChange();
@@ -1055,6 +1068,7 @@ bool Debugger::HasCpuType(CpuType cpuType)
 void Debugger::SetBreakpoints(Breakpoint breakpoints[], uint32_t length)
 {
 	DebugBreakHelper helper(this);
+	_hasBreakpoints = length > 0;
 	for(int i = 0; i <= (int)DebugUtilities::GetLastCpuType(); i++) {
 		if(_debuggers[i].Debugger) {
 			_debuggers[i].Debugger->GetBreakpointManager()->SetBreakpoints(breakpoints, length);

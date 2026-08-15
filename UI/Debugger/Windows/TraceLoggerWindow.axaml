@@ -43,7 +43,14 @@
 		</c:MesenMenu>
 
 		<StackPanel Orientation="Horizontal" DockPanel.Dock="Top" IsVisible="{Binding Config.ShowToolbar}">
-			<dc:ActionToolbar Items="{Binding ToolbarItems}" />
+			<dc:ActionToolbar Items="{Binding ToolbarItems}">
+				<dc:ActionToolbar.IsUpdateEnabled>
+					<MultiBinding Converter="{x:Static BoolConverters.Or}">
+						<Binding Path="Config.EchoToGui" />
+						<Binding Path="IsLoggingToFile" />
+					</MultiBinding>
+				</dc:ActionToolbar.IsUpdateEnabled>
+			</dc:ActionToolbar>
 		</StackPanel>
 
 		<Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto" DockPanel.Dock="Bottom">
@@ -52,6 +59,13 @@
 				Click="OnClearClick"
 				Icon="Assets/Close.png"
 				Text="{l:Translate btnClear}"
+			/>
+
+			<CheckBox
+				Grid.Column="1"
+				VerticalAlignment="Center"
+				Content="{l:Translate chkEchoToGui}"
+				IsChecked="{Binding Config.EchoToGui}"
 			/>
 
 			<c:ButtonWithIcon

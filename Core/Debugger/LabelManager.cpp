@@ -3,6 +3,7 @@
 #include "Debugger/Debugger.h"
 #include "Debugger/DebugUtilities.h"
 #include "Debugger/DebugBreakHelper.h"
+#include "Debugger/TraceLogFileSaver.h"
 
 LabelManager::LabelManager(Debugger* debugger)
 {
@@ -12,6 +13,7 @@ LabelManager::LabelManager(Debugger* debugger)
 void LabelManager::ClearLabels()
 {
 	DebugBreakHelper helper(_debugger);
+	_debugger->GetTraceLogFileSaver()->FlushPending();
 	_codeLabels.clear();
 	_codeLabelReverseLookup.clear();
 }
@@ -19,6 +21,7 @@ void LabelManager::ClearLabels()
 void LabelManager::SetLabel(uint32_t address, MemoryType memType, string label, string comment)
 {
 	DebugBreakHelper helper(_debugger);
+	_debugger->GetTraceLogFileSaver()->FlushPending();
 	uint64_t key = GetLabelKey(address, memType);
 
 	auto existingLabel = _codeLabels.find(key);

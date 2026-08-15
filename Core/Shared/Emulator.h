@@ -267,6 +267,9 @@ public:
 	template<CpuType type> __forceinline void ProcessInstruction()
 	{
 		if(_internalDebugger) {
+			if constexpr(type == CpuType::Snes) {
+				if(_internalDebugger->IsTraceOnly()) { return; }
+			}
 			_internalDebugger->ProcessInstruction<type>();
 		}
 	}
@@ -296,6 +299,7 @@ public:
 	template<CpuType type> __forceinline void ProcessIdleCycle()
 	{
 		if(_internalDebugger) {
+			if constexpr(type == CpuType::Snes) { if(_internalDebugger->IsTraceOnly()) { return; } }
 			_internalDebugger->ProcessIdleCycle<type>();
 		}
 	}
@@ -310,6 +314,7 @@ public:
 	template<CpuType type, typename T> __forceinline void ProcessPpuRead(uint32_t addr, T& value, MemoryType memoryType, MemoryOperationType opType = MemoryOperationType::Read)
 	{
 		if(_internalDebugger) {
+			if constexpr(type == CpuType::Snes) { if(_internalDebugger->IsTraceOnly()) { return; } }
 			_internalDebugger->ProcessPpuRead<type>(addr, value, memoryType, opType);
 		}
 	}
@@ -317,6 +322,7 @@ public:
 	template<CpuType type, typename T> __forceinline void ProcessPpuWrite(uint32_t addr, T& value, MemoryType memoryType)
 	{
 		if(_internalDebugger) {
+			if constexpr(type == CpuType::Snes) { if(_internalDebugger->IsTraceOnly()) { return; } }
 			_internalDebugger->ProcessPpuWrite<type>(addr, value, memoryType);
 		}
 	}
@@ -324,6 +330,7 @@ public:
 	template<CpuType type> __forceinline void ProcessPpuCycle()
 	{
 		if(_internalDebugger) {
+			if constexpr(type == CpuType::Snes) { if(_internalDebugger->IsTraceOnly()) { return; } }
 			_internalDebugger->ProcessPpuCycle<type>();
 		}
 	}

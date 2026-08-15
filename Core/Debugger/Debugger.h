@@ -86,6 +86,8 @@ private:
 	DebugControllerState _inputOverrides[8] = {};
 
 	bool _waitForBreakResume = false;
+	atomic<bool> _traceOnlyRequested = false;
+	atomic<bool> _hasBreakpoints = false;
 
 	void Reset();
 
@@ -188,6 +190,8 @@ public:
 	IDebugger* GetMainDebugger();
 
 	TraceLogFileSaver* GetTraceLogFileSaver() { return _traceLogSaver.get(); }
+	void SetTraceOnly(bool enabled) { _traceOnlyRequested = enabled; }
+	bool IsTraceOnly() const { return _traceOnlyRequested && !_hasBreakpoints && _breakRequestCount == 0; }
 	MemoryDumper* GetMemoryDumper() { return _memoryDumper.get(); }
 	MemoryAccessCounter* GetMemoryAccessCounter() { return _memoryAccessCounter.get(); }
 	Disassembler* GetDisassembler() { return _disassembler.get(); }
