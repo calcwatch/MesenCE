@@ -190,7 +190,13 @@ namespace Mesen.Debugger.Windows
 
 		private async void OnStartLoggingClick(object sender, RoutedEventArgs e)
 		{
-			string? filename = await FileDialogHelper.SaveFile(ConfigManager.DebuggerFolder, EmuApi.GetRomInfo().GetRomName() + ".txt", this.GetWindow(), FileDialogHelper.TraceExt);
+			string? filename = await FileDialogHelper.SaveFile(
+				ConfigManager.DebuggerFolder,
+				EmuApi.GetRomInfo().GetRomName(),
+				this.GetWindow(),
+				FileDialogHelper.TraceExt,
+				FileDialogHelper.CompressedTraceExt
+			);
 			if(filename != null) {
 				_model.TraceFile = filename;
 				_model.IsLoggingToFile = true;

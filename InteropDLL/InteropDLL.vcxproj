@@ -227,6 +227,9 @@
     <ProjectReference Include="..\SevenZip\SevenZip.vcxproj">
       <Project>{52c4ba3a-e699-4305-b23f-c9083fd07ab6}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\Zstd\Zstd.vcxproj">
+      <Project>{440deffd-17f7-4fee-9215-6ca81070aba9}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Utilities\Utilities.vcxproj">
       <Project>{b5330148-e8c7-46ba-b54e-69be59ea337d}</Project>
     </ProjectReference>

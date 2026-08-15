@@ -19,6 +19,7 @@ namespace Mesen.Utilities
 		public const string TblExt = "tbl";
 		public const string PaletteExt = "pal";
 		public const string TraceExt = "txt";
+		public const string CompressedTraceExt = "zst";
 		public const string ZipExt = "zip";
 		public const string GifExt = "gif";
 		public const string AviExt = "avi";

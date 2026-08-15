@@ -30,6 +30,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SevenZip", "SevenZip\SevenZ
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Lua", "Lua\Lua.vcxproj", "{B609E0A0-5050-4871-91D6-E760633BCDD1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Zstd", "Zstd\Zstd.vcxproj", "{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -139,6 +141,18 @@ Global
 		{B609E0A0-5050-4871-91D6-E760633BCDD1}.Release|Any CPU.ActiveCfg = Release|x64
 		{B609E0A0-5050-4871-91D6-E760633BCDD1}.Release|x64.ActiveCfg = Release|x64
 		{B609E0A0-5050-4871-91D6-E760633BCDD1}.Release|x64.Build.0 = Release|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.Debug|x64.ActiveCfg = Debug|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.Debug|x64.Build.0 = Debug|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.PGO Optimize|Any CPU.ActiveCfg = PGO Optimize|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.PGO Optimize|x64.ActiveCfg = PGO Optimize|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.PGO Optimize|x64.Build.0 = PGO Optimize|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.PGO Profile|Any CPU.ActiveCfg = PGO Profile|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.PGO Profile|x64.ActiveCfg = PGO Profile|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.PGO Profile|x64.Build.0 = PGO Profile|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.Release|Any CPU.ActiveCfg = Release|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.Release|x64.ActiveCfg = Release|x64
+		{440DEFFD-17F7-4FEE-9215-6CA81070ABA9}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
