@@ -155,6 +155,7 @@ protected:
 	MemoryType _cpuMemoryType = MemoryType::SnesMemory;
 
 	vector<RowPart> _rowParts;
+	string _fileLogRow;
 
 	uint32_t _currentPos = 0;
 
@@ -300,18 +301,17 @@ protected:
 		_pendingLog = false;
 
 		if(_debugger->GetTraceLogFileSaver()->IsEnabled()) {
-			string row;
-			row.reserve(300);
+			_fileLogRow.clear();
 
 			//Display PC
 			RowPart rowPart = {};
 			rowPart.DisplayInHex = true;
 			rowPart.MinWidth = DebugUtilities::GetProgramCounterSize(_cpuType);
-			WriteIntValue(row, ((TraceLoggerType*)this)->GetProgramCounter(cpuState), rowPart);
-			row += "  ";
+			WriteIntValue(_fileLogRow, ((TraceLoggerType*)this)->GetProgramCounter(cpuState), rowPart);
+			_fileLogRow += "  ";
 
-			((TraceLoggerType*)this)->GetTraceRow(row, cpuState, _ppuState[_currentPos], disassemblyInfo);
-			_debugger->GetTraceLogFileSaver()->Log(row);
+			((TraceLoggerType*)this)->GetTraceRow(_fileLogRow, cpuState, _ppuState[_currentPos], disassemblyInfo);
+			_debugger->GetTraceLogFileSaver()->Log(_fileLogRow);
 		}
 
 		_currentPos = (_currentPos + 1) % ExecutionLogSize;
@@ -417,6 +417,7 @@ public:
 		_options = {};
 		_currentPos = 0;
 		_pendingLog = false;
+		_fileLogRow.reserve(300);
 
 		_disassemblyCache = new DisassemblyInfo[BaseTraceLogger::ExecutionLogSize];
 		_rowIds = new uint64_t[BaseTraceLogger::ExecutionLogSize];
